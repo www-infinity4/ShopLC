@@ -1,0 +1,144 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="referrer" content="strict-origin-when-cross-origin">
+  <meta name="theme-color" content="#120a1d">
+  <title>ShopLC Live Companion</title>
+  <meta name="description" content="A live shopping-channel experiment built around Shop LC's official YouTube stream, current shopping paths, auctions, offers, and contextual commercial inventory.">
+  <link rel="canonical" href="https://www-infinity4.github.io/ShopLC/">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="ShopLC Live Companion">
+  <meta property="og:title" content="ShopLC Live — Shopping TV With a Smarter Commercial Layer">
+  <meta property="og:description" content="Watch the live Shop LC stream, jump to current offers, and test contextual commercial spots around the show.">
+  <meta property="og:url" content="https://www-infinity4.github.io/ShopLC/">
+  <meta property="og:image" content="https://i.ytimg.com/vi/eqpG55UKM8M/maxresdefault.jpg">
+  <meta property="og:image:secure_url" content="https://i.ytimg.com/vi/eqpG55UKM8M/maxresdefault.jpg">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="ShopLC Live — Smarter Shopping TV">
+  <meta name="twitter:description" content="Live shopping television with current offer links and contextual ad experiments.">
+  <meta name="twitter:image" content="https://i.ytimg.com/vi/eqpG55UKM8M/maxresdefault.jpg">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header class="masthead">
+    <a class="brand" href="#top" aria-label="ShopLC live companion home">
+      <span class="brand-mark">LC</span><span>ShopLC</span>
+    </a>
+    <details class="channel-menu">
+      <summary aria-label="Open channel menu"><span>☰</span><span class="menu-label">Channels</span></summary>
+      <nav aria-label="Switch channels">
+        <a href="https://www-infinity4.github.io/Hermit-TV/">Hermit TV</a>
+        <a href="https://www-infinity4.github.io/Star-Launcher/">Star Launcher</a>
+        <a href="https://www-infinity4.github.io/HBO/">HBO</a>
+        <a href="https://www-infinity4.github.io/Cinemax/">Cinemax</a>
+        <a href="https://www-infinity4.github.io/Starz/">Starz</a>
+        <a href="https://www-infinity4.github.io/Encore/">Encore</a>
+        <a href="https://www-infinity4.github.io/Cartoon-Network/">Cartoon Network</a>
+        <a href="https://www-infinity4.github.io/WGN/">WGN</a>
+        <a aria-current="page" href="https://www-infinity4.github.io/ShopLC/">ShopLC</a>
+        <a href="https://www-infinity4.github.io/TV-Database/">StarQuest</a>
+      </nav>
+    </details>
+    <div class="on-air"><span></span> LIVE SHOPPING</div>
+    <time id="stationClock">--:-- -- local</time>
+  </header>
+
+  <main id="top">
+    <section class="theater" aria-labelledby="nowTitle">
+      <div class="marquee">
+        <div>
+          <p id="modeLabel">OFFICIAL SHOP LC STREAM</p>
+          <h1 id="nowTitle">Shop LC live — deals, gemstones, fashion & home</h1>
+        </div>
+        <div class="live-chip">24/7 FEED</div>
+      </div>
+
+      <div class="screen-shell">
+        <div id="player" class="player" aria-label="Shop LC official YouTube live player"></div>
+        <button id="soundButton" class="sound-button" type="button">Tap for sound</button>
+      </div>
+
+      <div class="controls" aria-label="Channel controls">
+        <a class="buy-button track" data-track="shop-live" href="https://www.shoplc.com/pages/live-tv" target="_blank" rel="noopener">Shop what’s airing</a>
+        <a class="control-link track" data-track="hot-deals" href="https://www.shoplc.com/collections/hot-deals" target="_blank" rel="noopener">Hot deals</a>
+        <a class="control-link track" data-track="special-offers" href="https://www.shoplc.com/collections/special-offer" target="_blank" rel="noopener">Special offers</a>
+        <button id="shareButton" class="share-button" type="button">Share · +1/10 ⭐</button>
+        <span id="shareStatus" class="share-status" role="status" aria-live="polite"></span>
+      </div>
+    </section>
+
+    <section class="now-shop" aria-labelledby="shopHeading">
+      <div class="section-heading">
+        <p>BUY WITHOUT LOSING THE SHOW</p>
+        <h2 id="shopHeading">Shop the live moment</h2>
+      </div>
+      <div class="shop-grid">
+        <a class="shop-card track" data-track="live-tv" href="https://www.shoplc.com/pages/live-tv" target="_blank" rel="noopener">
+          <span>ON AIR</span><strong>Currently featured</strong><p>Open Shop LC’s live product page in a new tab while this stream keeps playing.</p><b>View current item →</b>
+        </a>
+        <a class="shop-card track" data-track="auctions" href="https://www.shoplc.com/pages/online-auctions-ra?categoryname=Rings%2CBracelets%2CNecklaces%2CSets%2CEarrings%2CPendants&sort=enddate&sortorder=1" target="_blank" rel="noopener">
+          <span>$1 AUCTIONS</span><strong>Bid while you watch</strong><p>A separate high-intent path for viewers who want the chase rather than a fixed-price item.</p><b>Open auctions →</b>
+        </a>
+        <a class="shop-card track" data-track="offer-items" href="https://www.shoplc.com/collections/offer-items" target="_blank" rel="noopener">
+          <span>DEAL SHELF</span><strong>Browse offer items</strong><p>Thousands of current offer products without baking prices into this page.</p><b>Browse deals →</b>
+        </a>
+      </div>
+    </section>
+
+    <section class="ad-lab" aria-labelledby="adHeading">
+      <div class="section-heading">
+        <p>COMMERCIAL EXPERIMENT</p>
+        <h2 id="adHeading">Can the companion spots sell better?</h2>
+      </div>
+      <div class="ad-layout">
+        <article id="commercialCard" class="commercial-card">
+          <span id="commercialEyebrow">CONTEXTUAL BREAK</span>
+          <h3 id="commercialTitle">Loading commercial concept…</h3>
+          <p id="commercialCopy"></p>
+          <a id="commercialCta" class="track" data-track="commercial" href="https://www.shoplc.com/pages/live-tv" target="_blank" rel="noopener">Open offer</a>
+          <small id="commercialCounter">Spot rotates automatically.</small>
+        </article>
+        <aside class="scoreboard">
+          <p>LOCAL TEST METRICS</p>
+          <div><strong id="impressionsCount">0</strong><span>commercial impressions</span></div>
+          <div><strong id="clicksCount">0</strong><span>commercial clicks</span></div>
+          <div><strong id="ctrCount">0%</strong><span>click-through rate</span></div>
+          <small>Stored only on this device for the experiment.</small>
+        </aside>
+      </div>
+    </section>
+
+    <section class="category-strip" aria-label="Shop LC categories">
+      <a class="track" data-track="jewelry" href="https://www.shoplc.com/collections/jewelry" target="_blank" rel="noopener">Jewelry</a>
+      <a class="track" data-track="home" href="https://www.shoplc.com/collections/home" target="_blank" rel="noopener">Home</a>
+      <a class="track" data-track="beauty" href="https://www.shoplc.com/collections/beauty" target="_blank" rel="noopener">Beauty</a>
+      <a class="track" data-track="fashion" href="https://www.shoplc.com/collections/fashion" target="_blank" rel="noopener">Fashion</a>
+      <a class="track" data-track="clearance" href="https://www.shoplc.com/collections/clearance-jewelry" target="_blank" rel="noopener">Clearance</a>
+    </section>
+  </main>
+
+  <section class="channel-directory" aria-labelledby="channelDirectoryHeading">
+    <p id="channelDirectoryHeading">Choose another channel</p>
+    <nav aria-label="All channels">
+      <a href="https://www-infinity4.github.io/Hermit-TV/">Hermit TV</a>
+      <a href="https://www-infinity4.github.io/Star-Launcher/">Star Launcher</a>
+      <a href="https://www-infinity4.github.io/HBO/">HBO</a>
+      <a href="https://www-infinity4.github.io/Cinemax/">Cinemax</a>
+      <a href="https://www-infinity4.github.io/Starz/">Starz</a>
+      <a href="https://www-infinity4.github.io/Encore/">Encore</a>
+      <a href="https://www-infinity4.github.io/Cartoon-Network/">Cartoon Network</a>
+      <a href="https://www-infinity4.github.io/WGN/">WGN</a>
+      <a aria-current="page" href="https://www-infinity4.github.io/ShopLC/">ShopLC</a>
+    </nav>
+  </section>
+
+  <footer>
+    <span>SHOPLC LIVE COMPANION</span>
+    <p>Independent viewing and advertising experiment using Shop LC’s embeddable YouTube stream. Purchases, prices, availability, fulfillment and returns are handled by Shop LC. No paid sponsor is implied by an unlabeled link.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
