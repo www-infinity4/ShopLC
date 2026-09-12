@@ -1,9 +1,13 @@
 (function(){
   "use strict";
   const $=id=>document.getElementById(id);
-  const VIDEO_IDS=["eqpG55UKM8M","1P-CaNhOeBo"];
-  let videoIndex=0,player=null,ready=false;
-  const clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus");
+  const STREAMS=[
+    "https://cdn-shop-lc-01.vos360.video/Content/HLS_HLS/Live/channel%28ShopLCStirrTV%29/master.m3u8",
+    "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28ott%29/master.m3u8",
+    "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28xumo%29/index.m3u8"
+  ];
+  let streamIndex=0,hls=null,started=false,recoveries=0;
+  const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
   const commercial={card:$("commercialCard"),eyebrow:$("commercialEyebrow"),title:$("commercialTitle"),copy:$("commercialCopy"),cta:$("commercialCta"),counter:$("commercialCounter")};
   const metricsEls={impressions:$("impressionsCount"),clicks:$("clicksCount"),ctr:$("ctrCount")};
 
@@ -33,8 +37,7 @@
     commercial.cta.href=spot.url;
     commercial.cta.dataset.commercialId=spot.id;
     commercial.counter.textContent=`Commercial concept ${i+1} of ${spots.length} · rotates every 45 seconds`;
-    const m=metrics();
-    m.impressions+=1;m.spotViews[spot.id]=(m.spotViews[spot.id]||0)+1;saveMetrics(m);
+    const m=metrics();m.impressions+=1;m.spotViews[spot.id]=(m.spotViews[spot.id]||0)+1;saveMetrics(m);
   }
 
   commercial.cta.addEventListener("click",()=>{
@@ -52,37 +55,66 @@
 
   function updateClock(){clock.textContent=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(new Date())+" local"}
 
-  function loadYouTubeApi(){
-    if(window.YT&&window.YT.Player){initPlayer();return}
-    window.onYouTubeIframeAPIReady=initPlayer;
-    const s=document.createElement("script");s.src="https://www.youtube.com/iframe_api";s.referrerPolicy="strict-origin-when-cross-origin";document.head.appendChild(s);
+  function destroyHls(){if(hls){try{hls.destroy()}catch(_){}hls=null}}
+  function setStatus(text){if(modeLabel)modeLabel.textContent=text}
+  function tryPlay(){
+    player.muted=true;
+    const p=player.play();
+    if(p&&typeof p.catch==="function")p.catch(()=>{});
+  }
+  function nextStream(reason){
+    destroyHls();
+    recoveries=0;
+    streamIndex=(streamIndex+1)%STREAMS.length;
+    setStatus(`SHOP LC LIVE · SWITCHING FEED ${streamIndex+1}/${STREAMS.length}`);
+    setTimeout(()=>loadStream(streamIndex),700);
+  }
+  function loadStream(index){
+    const url=STREAMS[index];
+    started=false;
+    player.pause();
+    player.removeAttribute("src");
+    player.load();
+    setStatus(`SHOP LC LIVE · CONNECTING ${index+1}/${STREAMS.length}`);
+
+    if(player.canPlayType("application/vnd.apple.mpegurl")){
+      player.src=url;
+      player.addEventListener("loadedmetadata",()=>{started=true;setStatus("SHOP LC LIVE BROADCAST");tryPlay()},{once:true});
+      return;
+    }
+
+    if(window.Hls&&window.Hls.isSupported()){
+      hls=new Hls({
+        enableWorker:true,
+        lowLatencyMode:true,
+        backBufferLength:30,
+        manifestLoadingTimeOut:12000,
+        levelLoadingTimeOut:12000,
+        fragLoadingTimeOut:15000
+      });
+      hls.attachMedia(player);
+      hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls.loadSource(url));
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>{started=true;recoveries=0;setStatus("SHOP LC LIVE BROADCAST");tryPlay()});
+      hls.on(Hls.Events.ERROR,(_event,data)=>{
+        if(!data||!data.fatal)return;
+        if(data.type===Hls.ErrorTypes.MEDIA_ERROR&&recoveries<1){recoveries++;try{hls.recoverMediaError();return}catch(_){}}
+        if(data.type===Hls.ErrorTypes.NETWORK_ERROR&&recoveries<1){recoveries++;try{hls.startLoad();return}catch(_){}}
+        nextStream(data.details||"fatal hls error");
+      });
+      return;
+    }
+
+    setStatus("LIVE STREAM NEEDS A MODERN BROWSER");
   }
 
-  function initPlayer(){
-    if(player)return;
-    player=new YT.Player("player",{
-      videoId:VIDEO_IDS[videoIndex],width:"100%",height:"100%",
-      playerVars:{autoplay:1,mute:1,playsinline:1,controls:1,rel:0,modestbranding:1,enablejsapi:1,origin:location.origin,widget_referrer:location.href},
-      events:{
-        onReady:()=>{ready=true;try{player.mute();player.playVideo()}catch(_){}},
-        onStateChange:e=>{if(e.data===YT.PlayerState.ENDED)loadFallback()},
-        onError:()=>loadFallback()
-      }
-    });
-  }
-
-  function loadFallback(){
-    if(!ready||VIDEO_IDS.length<2)return;
-    videoIndex=(videoIndex+1)%VIDEO_IDS.length;
-    try{player.loadVideoById(VIDEO_IDS[videoIndex]);player.mute();player.playVideo()}catch(_){}
-  }
+  player.addEventListener("playing",()=>{started=true;setStatus("SHOP LC LIVE BROADCAST")});
+  player.addEventListener("stalled",()=>{if(started&&hls){try{hls.startLoad()}catch(_){}}});
+  player.addEventListener("error",()=>{if(!hls)nextStream("video element error")});
 
   soundButton.addEventListener("click",()=>{
-    if(!ready)return;
-    try{
-      if(player.isMuted()){player.unMute();player.setVolume(100);soundButton.textContent="Sound on";setTimeout(()=>soundButton.remove(),1200)}
-      else{player.mute();soundButton.textContent="Tap for sound"}
-    }catch(_){}
+    player.muted=!player.muted;
+    if(!player.muted){player.volume=1;soundButton.textContent="Sound on";tryPlay();setTimeout(()=>soundButton.remove(),1200)}
+    else soundButton.textContent="Tap for sound";
   });
 
   function localShareCredit(reference){
@@ -106,5 +138,5 @@
   showSpot(Math.floor(Date.now()/45000));
   setInterval(()=>showSpot(Math.floor(Date.now()/45000)),1000);
   updateClock();setInterval(updateClock,1000);
-  loadYouTubeApi();
+  loadStream(0);
 })();
