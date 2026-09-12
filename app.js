@@ -6,7 +6,7 @@
     "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28ott%29/master.m3u8",
     "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28xumo%29/index.m3u8"
   ];
-  let streamIndex=0,hls=null,started=false,recoveries=0;
+  let streamIndex=0,hls=null,started=false,recoveries=0,failedFeeds=0;
   const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
   const commercial={card:$("commercialCard"),eyebrow:$("commercialEyebrow"),title:$("commercialTitle"),copy:$("commercialCopy"),cta:$("commercialCta"),counter:$("commercialCounter")};
   const metricsEls={impressions:$("impressionsCount"),clicks:$("clicksCount"),ctr:$("ctrCount")};
@@ -54,21 +54,25 @@
   });
 
   function updateClock(){clock.textContent=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(new Date())+" local"}
-
   function destroyHls(){if(hls){try{hls.destroy()}catch(_){}hls=null}}
   function setStatus(text){if(modeLabel)modeLabel.textContent=text}
-  function tryPlay(){
-    player.muted=true;
-    const p=player.play();
-    if(p&&typeof p.catch==="function")p.catch(()=>{});
-  }
-  function nextStream(reason){
+  function tryPlay(){const p=player.play();if(p&&typeof p.catch==="function")p.catch(()=>{})}
+
+  function nextStream(){
     destroyHls();
     recoveries=0;
+    failedFeeds+=1;
+    if(failedFeeds>=STREAMS.length){
+      setStatus("SHOP LC LIVE · RECONNECTING");
+      streamIndex=0;
+      setTimeout(()=>{failedFeeds=0;loadStream(0)},15000);
+      return;
+    }
     streamIndex=(streamIndex+1)%STREAMS.length;
     setStatus(`SHOP LC LIVE · SWITCHING FEED ${streamIndex+1}/${STREAMS.length}`);
-    setTimeout(()=>loadStream(streamIndex),700);
+    setTimeout(()=>loadStream(streamIndex),900);
   }
+
   function loadStream(index){
     const url=STREAMS[index];
     started=false;
@@ -79,27 +83,20 @@
 
     if(player.canPlayType("application/vnd.apple.mpegurl")){
       player.src=url;
-      player.addEventListener("loadedmetadata",()=>{started=true;setStatus("SHOP LC LIVE BROADCAST");tryPlay()},{once:true});
+      player.addEventListener("loadedmetadata",()=>{started=true;failedFeeds=0;setStatus("SHOP LC LIVE BROADCAST");tryPlay()},{once:true});
       return;
     }
 
     if(window.Hls&&window.Hls.isSupported()){
-      hls=new Hls({
-        enableWorker:true,
-        lowLatencyMode:true,
-        backBufferLength:30,
-        manifestLoadingTimeOut:12000,
-        levelLoadingTimeOut:12000,
-        fragLoadingTimeOut:15000
-      });
+      hls=new Hls({enableWorker:true,lowLatencyMode:true,backBufferLength:30,manifestLoadingTimeOut:12000,levelLoadingTimeOut:12000,fragLoadingTimeOut:15000});
       hls.attachMedia(player);
       hls.on(Hls.Events.MEDIA_ATTACHED,()=>hls.loadSource(url));
-      hls.on(Hls.Events.MANIFEST_PARSED,()=>{started=true;recoveries=0;setStatus("SHOP LC LIVE BROADCAST");tryPlay()});
+      hls.on(Hls.Events.MANIFEST_PARSED,()=>{started=true;recoveries=0;failedFeeds=0;setStatus("SHOP LC LIVE BROADCAST");tryPlay()});
       hls.on(Hls.Events.ERROR,(_event,data)=>{
         if(!data||!data.fatal)return;
         if(data.type===Hls.ErrorTypes.MEDIA_ERROR&&recoveries<1){recoveries++;try{hls.recoverMediaError();return}catch(_){}}
         if(data.type===Hls.ErrorTypes.NETWORK_ERROR&&recoveries<1){recoveries++;try{hls.startLoad();return}catch(_){}}
-        nextStream(data.details||"fatal hls error");
+        nextStream();
       });
       return;
     }
@@ -107,9 +104,9 @@
     setStatus("LIVE STREAM NEEDS A MODERN BROWSER");
   }
 
-  player.addEventListener("playing",()=>{started=true;setStatus("SHOP LC LIVE BROADCAST")});
+  player.addEventListener("playing",()=>{started=true;failedFeeds=0;setStatus("SHOP LC LIVE BROADCAST")});
   player.addEventListener("stalled",()=>{if(started&&hls){try{hls.startLoad()}catch(_){}}});
-  player.addEventListener("error",()=>{if(!hls)nextStream("video element error")});
+  player.addEventListener("error",()=>{if(!hls)nextStream()});
 
   soundButton.addEventListener("click",()=>{
     player.muted=!player.muted;
@@ -138,5 +135,6 @@
   showSpot(Math.floor(Date.now()/45000));
   setInterval(()=>showSpot(Math.floor(Date.now()/45000)),1000);
   updateClock();setInterval(updateClock,1000);
+  player.muted=true;
   loadStream(0);
 })();
