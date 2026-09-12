@@ -6,12 +6,12 @@
   <meta name="referrer" content="strict-origin-when-cross-origin">
   <meta name="theme-color" content="#120a1d">
   <title>ShopLC Live Companion</title>
-  <meta name="description" content="A live shopping-channel experiment built around Shop LC's official YouTube stream, current shopping paths, auctions, offers, and contextual commercial inventory.">
+  <meta name="description" content="A live shopping-channel experiment built around Shop LC's live broadcast feed, current shopping paths, auctions, offers, and contextual commercial inventory.">
   <link rel="canonical" href="https://www-infinity4.github.io/ShopLC/">
   <meta property="og:type" content="website">
   <meta property="og:site_name" content="ShopLC Live Companion">
   <meta property="og:title" content="ShopLC Live — Shopping TV With a Smarter Commercial Layer">
-  <meta property="og:description" content="Watch the live Shop LC stream, jump to current offers, and test contextual commercial spots around the show.">
+  <meta property="og:description" content="Watch Shop LC live, jump to current offers, and test contextual commercial spots around the show.">
   <meta property="og:url" content="https://www-infinity4.github.io/ShopLC/">
   <meta property="og:image" content="https://i.ytimg.com/vi/eqpG55UKM8M/maxresdefault.jpg">
   <meta property="og:image:secure_url" content="https://i.ytimg.com/vi/eqpG55UKM8M/maxresdefault.jpg">
@@ -49,14 +49,14 @@
     <section class="theater" aria-labelledby="nowTitle">
       <div class="marquee">
         <div>
-          <p id="modeLabel">OFFICIAL SHOP LC STREAM</p>
+          <p id="modeLabel">SHOP LC LIVE BROADCAST</p>
           <h1 id="nowTitle">Shop LC live — deals, gemstones, fashion & home</h1>
         </div>
-        <div class="live-chip">24/7 FEED</div>
+        <div class="live-chip">LIVE FEED</div>
       </div>
 
       <div class="screen-shell">
-        <div id="player" class="player" aria-label="Shop LC official YouTube live player"></div>
+        <video id="player" class="player" aria-label="Shop LC live broadcast player" autoplay muted playsinline controls preload="auto"></video>
         <button id="soundButton" class="sound-button" type="button">Tap for sound</button>
       </div>
 
@@ -136,9 +136,10 @@
 
   <footer>
     <span>SHOPLC LIVE COMPANION</span>
-    <p>Independent viewing and advertising experiment using Shop LC’s embeddable YouTube stream. Purchases, prices, availability, fulfillment and returns are handled by Shop LC. No paid sponsor is implied by an unlabeled link.</p>
+    <p>Independent viewing and advertising experiment using Shop LC’s public live broadcast feed. Purchases, prices, availability, fulfillment and returns are handled by Shop LC. No paid sponsor is implied by an unlabeled link.</p>
   </footer>
 
+  <script src="https://cdn.jsdelivr.net/npm/hls.js@1/dist/hls.min.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
