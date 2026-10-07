@@ -91,6 +91,35 @@
     return publicLedger("/v1/shoplc/current-item");
   }
 
+  async function storeShopLcClick(product,actionType){
+    const token=deviceToken();
+    if(!token)return null;
+    const payload={
+      clickId:uid("shoplc-signal"),
+      itemId:String(product.itemId||""),
+      href:String(product.href||"https://www.shoplc.com/"),
+      title:String(product.title||""),
+      category:String(product.category||""),
+      gemstone:String(product.gemstone||""),
+      ringSize:String(product.ringSize||""),
+      metal:String(product.metal||""),
+      style:String(product.style||""),
+      price:Number(product.price)||0,
+      image:String(product.image||""),
+      actionType:String(actionType||"view"),
+      quantId:activeQuantId()
+    };
+    const response=await fetch(LEDGER_ENDPOINT+"/v1/shoplc/clicks",{
+      method:"POST",
+      headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify(payload),
+      cache:"no-store"
+    });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok)throw new Error(data.message||data.error||("http_"+response.status));
+    return data;
+  }
+
   async function rewardShopLcClick({actionType,itemId,href}){
     const token=deviceToken();
     if(!token){
@@ -128,11 +157,28 @@
     return data;
   }
 
-  function openInsideShopLc(href,title){
+  function openSafeProduct(product,actionType){
     if(!shopBrowser||!shopFrame)return;
+    const safe=new URL("item.html",location.href);
+    const params={
+      title:product.title||"Shop LC item",
+      href:product.href||"https://www.shoplc.com/",
+      image:product.image||"",
+      price:product.price||"",
+      category:product.category||"",
+      gemstone:product.gemstone||"",
+      ringSize:product.ringSize||"",
+      metal:product.metal||"",
+      style:product.style||"",
+      code:product.productCode||String(product.itemId||"").replace(/^[^:]+:/,""),
+      itemId:product.itemId||"",
+      actionType:actionType||"view",
+      quantId:activeQuantId()
+    };
+    for(const [key,value] of Object.entries(params))if(String(value||""))safe.searchParams.set(key,String(value));
     shopBrowser.hidden=false;
-    shopFrame.src=href;
-    if(shopBrowserTitle)shopBrowserTitle.textContent=title||"Shop LC";
+    shopFrame.src=safe.href;
+    if(shopBrowserTitle)shopBrowserTitle.textContent=product.title||"Shop LC safe product";
     shopBrowser.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
@@ -145,7 +191,10 @@
       quantId:activeQuantId(),
       actionType:extra.actionType||"",
       itemId:extra.itemId||"",
-      rewardEligible:Boolean(extra.actionType&&extra.itemId)
+      rewardEligible:Boolean(extra.actionType&&extra.itemId),
+      title:extra.title||"",
+      gemstone:extra.gemstone||"",
+      ringSize:extra.ringSize||""
     };
     events.push(event);
     localStorage.setItem("shoplc_click_events_v1",JSON.stringify(events.slice(-250)));
@@ -156,22 +205,37 @@
     let href=link.href;
     const actionType=String(link.dataset.rewardAction||"").toLowerCase();
     let itemId=String(link.dataset.itemId||"");
-    openInsideShopLc(href,actionType==="bid"?"Shop LC auction":"Shop LC shopping");
+    let product={
+      itemId:itemId||("browse:"+String(link.dataset.track||"shoplc").replace(/[^a-z0-9_-]/gi,"-")),
+      href,
+      title:String(link.textContent||"Shop LC").replace(/\s+/g," ").trim().slice(0,500),
+      category:String(link.dataset.track||"shopping").slice(0,80)
+    };
 
     if(actionType==="buy"&&link.dataset.itemSource==="current-live"){
       try{
         const current=await currentLiveItem();
-        itemId=String(current.itemId||"");
-        href=String(current.href||href);
+        product={...product,...current,href:String(current.href||href),itemId:String(current.itemId||product.itemId)};
       }catch(error){
-        trackClick(link,{actionType:"",itemId:""});
-        setRewardStatus("Shop LC opened, but the current product ID could not be verified, so no StarCoins were issued.","warn");
+        trackClick(link,{actionType:"browse",itemId:product.itemId,title:product.title});
+        try{await storeShopLcClick(product,"browse")}catch(_){}
+        openSafeProduct(product,"browse");
+        setRewardStatus("The live product details could not be verified, so no StarCoins were issued for this click.","warn");
         return;
       }
+    }else if(actionType==="bid"){
+      const code=String(itemId||"").replace(/^auction:/,"");
+      product={...product,title:"Shop LC auction "+code,category:"auction"};
     }
 
-    trackClick(link,{actionType,itemId});
-    if(actionType&&itemId)await rewardShopLcClick({actionType,itemId,href});
+    trackClick(link,{actionType:actionType||"browse",itemId:product.itemId,title:product.title,gemstone:product.gemstone||"",ringSize:product.ringSize||""});
+    try{
+      await storeShopLcClick(product,actionType||"browse");
+    }catch(error){
+      console.warn("ShopLC cloud click storage:",error);
+    }
+    if(actionType&&product.itemId)await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});
+    openSafeProduct(product,actionType||"browse");
   }
 
   document.addEventListener("click",event=>{
