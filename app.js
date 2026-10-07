@@ -8,42 +8,6 @@
   ];
   let streamIndex=0,hls=null,started=false,recoveries=0,failedFeeds=0;
   const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
-  const commercial={card:$("commercialCard"),eyebrow:$("commercialEyebrow"),title:$("commercialTitle"),copy:$("commercialCopy"),cta:$("commercialCta"),counter:$("commercialCounter")};
-  const metricsEls={impressions:$("impressionsCount"),clicks:$("clicksCount"),ctr:$("ctrCount")};
-
-  const spots=[
-    {id:"current-item",eyebrow:"CONTEXTUAL BREAK · ON-AIR INTENT",title:"See the item while the host is still selling it",copy:"The highest-intent moment is usually right now. Keep the show running, open Shop LC’s current-on-air product page, and let the viewer decide before the segment moves on.",cta:"Shop what’s airing",url:"https://www.shoplc.com/pages/live-tv"},
-    {id:"auction",eyebrow:"CONTEXTUAL BREAK · GAMIFIED VALUE",title:"Turn bargain energy into a $1 auction visit",copy:"When the show is already creating urgency, an auction is a natural second destination. This spot tests whether viewers respond better to participation than to another traditional product pitch.",cta:"Enter the auctions",url:"https://www.shoplc.com/pages/online-auctions-ra?categoryname=Rings%2CBracelets%2CNecklaces%2CSets%2CEarrings%2CPendants&sort=enddate&sortorder=1"},
-    {id:"hot-deals",eyebrow:"CONTEXTUAL BREAK · PRICE DISCOVERY",title:"One clean deal button instead of another long commercial",copy:"Use the program to create desire, then give the viewer a simple price-discovery path. The page does not copy prices that may expire; Shop LC remains the source of truth.",cta:"See hot deals",url:"https://www.shoplc.com/collections/hot-deals"},
-    {id:"special-offers",eyebrow:"CONTEXTUAL BREAK · VALUE SHOPPER",title:"Catch the viewer who likes the show but not the exact item",copy:"A broad special-offer shelf gives the audience somewhere relevant to go even when the item on television is not their style. That makes the commercial useful instead of interruptive.",cta:"Browse special offers",url:"https://www.shoplc.com/collections/special-offer"},
-    {id:"under-50",eyebrow:"CONTEXTUAL BREAK · LOW-FRICTION ENTRY",title:"Sell the first click with a lower-price shopping lane",copy:"Not every viewer is ready for a high-ticket gemstone. A lower-price lane can convert curiosity into a first purchase and keep the shopping session alive.",cta:"Browse Shop LC",url:"https://www.shoplc.com/collections/offer-items"}
-  ];
-
-  function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(_){return fallback}}
-  function metrics(){return parse("shoplc_ad_metrics_v1",{impressions:0,clicks:0,spotViews:{},spotClicks:{}})}
-  function saveMetrics(m){localStorage.setItem("shoplc_ad_metrics_v1",JSON.stringify(m));renderMetrics(m)}
-  function renderMetrics(m){const ctr=m.impressions?((m.clicks/m.impressions)*100).toFixed(1):"0.0";metricsEls.impressions.textContent=m.impressions;metricsEls.clicks.textContent=m.clicks;metricsEls.ctr.textContent=`${ctr}%`}
-
-  let activeSpot=-1;
-  function showSpot(index){
-    const i=((index%spots.length)+spots.length)%spots.length;
-    if(i===activeSpot)return;
-    activeSpot=i;
-    const spot=spots[i];
-    commercial.eyebrow.textContent=spot.eyebrow;
-    commercial.title.textContent=spot.title;
-    commercial.copy.textContent=spot.copy;
-    commercial.cta.textContent=spot.cta;
-    commercial.cta.href=spot.url;
-    commercial.cta.dataset.commercialId=spot.id;
-    commercial.counter.textContent=`Commercial concept ${i+1} of ${spots.length} · rotates every 45 seconds`;
-    const m=metrics();m.impressions+=1;m.spotViews[spot.id]=(m.spotViews[spot.id]||0)+1;saveMetrics(m);
-  }
-
-  commercial.cta.addEventListener("click",()=>{
-    const id=commercial.cta.dataset.commercialId||"unknown";
-    const m=metrics();m.clicks+=1;m.spotClicks[id]=(m.spotClicks[id]||0)+1;saveMetrics(m);
-  });
 
   document.querySelectorAll("a.track").forEach(link=>{
     link.addEventListener("click",()=>{
@@ -126,14 +90,11 @@
   }
 
   shareButton.addEventListener("click",async()=>{
-    const data={title:"ShopLC Live Companion",text:"Watch Shop LC live with current shopping links and a smarter commercial experiment.",url:location.href};
+    const data={title:"ShopLC Live Companion",text:"Watch Shop LC live with current shopping links, offers, auctions, and deals.",url:location.href};
     if(!navigator.share){try{await navigator.clipboard.writeText(data.url);shareStatus.textContent="Link copied."}catch(_){shareStatus.textContent="Sharing unavailable."}return}
     try{await navigator.share(data);const r=localShareCredit(data.url);shareStatus.textContent=r.awarded?"Shared · 1 StarCoin completed!":`Shared · StarCoin progress ${r.progressToNextCoin}/10`}catch(e){if(!e||e.name!=="AbortError")shareStatus.textContent="Share did not complete."}
   });
 
-  renderMetrics(metrics());
-  showSpot(Math.floor(Date.now()/45000));
-  setInterval(()=>showSpot(Math.floor(Date.now()/45000)),1000);
   updateClock();setInterval(updateClock,1000);
   player.muted=true;
   loadStream(0);
