@@ -1,26 +1,219 @@
 (function(){
   "use strict";
+
   const $=id=>document.getElementById(id);
+  const LEDGER_ENDPOINT="https://starquest-ledger.marvaseater.workers.dev";
+  const DEVICE_PREFIX="starquest_ledger_device_v1:";
   const STREAMS=[
     "https://cdn-shop-lc-01.vos360.video/Content/HLS_HLS/Live/channel%28ShopLCStirrTV%29/master.m3u8",
     "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28ott%29/master.m3u8",
     "https://cdn-shop-lc-01.akamaized.net/Content/HLS_HLS/Live/channel%28xumo%29/index.m3u8"
   ];
+
   let streamIndex=0,hls=null,started=false,recoveries=0,failedFeeds=0;
   const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
+  const rewardStatus=$("rewardStatus"),rewardAuctionGrid=$("rewardAuctionGrid");
+  const shopBrowser=$("shopBrowser"),shopFrame=$("shopFrame"),shopBrowserTitle=$("shopBrowserTitle"),shopBrowserClose=$("shopBrowserClose");
 
-  function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(_){return fallback}}\n\n  document.querySelectorAll("a.track").forEach(link=>{
-    link.addEventListener("click",()=>{
-      const events=parse("shoplc_click_events_v1",[]);
-      events.push({id:link.dataset.track||"link",href:link.href,at:Date.now()});
-      localStorage.setItem("shoplc_click_events_v1",JSON.stringify(events.slice(-250)));
+  function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch(_){return fallback}}
+  function write(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch(_){return false}}
+  function uid(prefix){try{return prefix+"-"+crypto.randomUUID()}catch(_){return prefix+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)}}
+
+  function tokenFrom(raw){
+    if(/^sq_[A-Za-z0-9_-]{32,}$/.test(String(raw||"")))return String(raw);
+    try{
+      const value=JSON.parse(String(raw||"null"));
+      return /^sq_[A-Za-z0-9_-]{32,}$/.test(String(value&&value.deviceToken||""))?String(value.deviceToken):"";
+    }catch(_){return ""}
+  }
+
+  function deviceToken(){
+    const session=parse("starquest_session",null);
+    const names=[session&&session.key,session&&session.username].filter(Boolean).map(value=>String(value).toLowerCase());
+    for(const name of [...new Set(names)]){
+      const token=tokenFrom(localStorage.getItem(DEVICE_PREFIX+name));
+      if(token)return token;
+    }
+    const found=[];
+    for(let i=0;i<localStorage.length;i++){
+      const key=localStorage.key(i)||"";
+      if(!key.startsWith(DEVICE_PREFIX))continue;
+      const token=tokenFrom(localStorage.getItem(key));
+      if(token&&!found.includes(token))found.push(token);
+    }
+    return found.length===1?found[0]:"";
+  }
+
+  function activeQuantId(){
+    const items=parse("quantaPhiBuildHistoryV1",[]);
+    if(!Array.isArray(items)||!items.length)return "";
+    const sorted=items.slice().sort((a,b)=>Date.parse(b&&((b.created_at||b.createdAt))||0)-Date.parse(a&&((a.created_at||a.createdAt))||0));
+    const current=sorted[0]||{};
+    return String(current.search_id||current.token_id||current.tokenId||current.id||"").slice(0,240);
+  }
+
+  function applyCloudStarState(state){
+    if(!state||!Number.isFinite(Number(state.starCoins)))return;
+    const session=parse("starquest_session",null);
+    const users=parse("starquest_users",{});
+    const key=session&&session.key;
+    if(key&&users&&users[key]){
+      const profile={...users[key]};
+      profile.tokens=Number(state.starCoins)||0;
+      profile.pendingShareCredits=Number(state.pendingShareCredits)||0;
+      profile.shareCount=Number(state.shareCount)||0;
+      users[key]=profile;
+      write("starquest_users",users);
+    }else{
+      const guest=parse("starquest_guest_profile_v1",{key:"__guest__",username:"Guest",tokens:0,shareCount:0,pendingShareCredits:0,shareEvents:[],ledger:[]});
+      guest.tokens=Number(state.starCoins)||0;
+      guest.pendingShareCredits=Number(state.pendingShareCredits)||0;
+      guest.shareCount=Number(state.shareCount)||0;
+      write("starquest_guest_profile_v1",guest);
+    }
+    window.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-cloud",state}}));
+  }
+
+  function setRewardStatus(message,kind){
+    if(!rewardStatus)return;
+    rewardStatus.textContent=message||"";
+    rewardStatus.dataset.kind=kind||"";
+  }
+
+  async function publicLedger(path){
+    const response=await fetch(LEDGER_ENDPOINT+path,{cache:"no-store"});
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok)throw new Error(data.message||data.error||("http_"+response.status));
+    return data;
+  }
+
+  async function currentLiveItem(){
+    return publicLedger("/v1/shoplc/current-item");
+  }
+
+  async function rewardShopLcClick({actionType,itemId,href}){
+    const token=deviceToken();
+    if(!token){
+      setRewardStatus("Shop LC opened, but this StarCoin wallet is not connected to the cloud ledger yet.","warn");
+      return null;
+    }
+    setRewardStatus("Recording the item click and checking the 3-per-day limit...","pending");
+    const response=await fetch(LEDGER_ENDPOINT+"/v1/shoplc/rewards",{
+      method:"POST",
+      headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
+      body:JSON.stringify({
+        clickId:uid("shoplc-click"),
+        actionType,
+        itemId,
+        href,
+        quantId:activeQuantId()
+      }),
+      cache:"no-store"
     });
+    const data=await response.json().catch(()=>({}));
+    if(!response.ok||!data.ok){
+      setRewardStatus(data.message||"The StarCoin ledger did not accept this click.","error");
+      return null;
+    }
+    applyCloudStarState(data.state);
+    if(data.credited){
+      setRewardStatus("+5 StarCoins credited. "+data.remainingToday+" rewarded item"+(data.remainingToday===1?"":"s")+" left today.","ok");
+    }else if(data.reason==="item_already_rewarded"){
+      setRewardStatus("This Shop LC item already paid its one-time 5 StarCoin reward.","info");
+    }else if(data.reason==="daily_limit"){
+      setRewardStatus("Daily reward limit reached: 3 Shop LC items today.","info");
+    }else{
+      setRewardStatus("This click was already recorded; no duplicate StarCoins were added.","info");
+    }
+    return data;
+  }
+
+  function openInsideShopLc(href,title){
+    if(!shopBrowser||!shopFrame)return;
+    shopBrowser.hidden=false;
+    shopFrame.src=href;
+    if(shopBrowserTitle)shopBrowserTitle.textContent=title||"Shop LC";
+    shopBrowser.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+
+  function trackClick(link,extra={}){
+    const events=parse("shoplc_click_events_v1",[]);
+    const event={
+      id:link.dataset.track||"link",
+      href:link.href,
+      at:Date.now(),
+      quantId:activeQuantId(),
+      actionType:extra.actionType||"",
+      itemId:extra.itemId||"",
+      rewardEligible:Boolean(extra.actionType&&extra.itemId)
+    };
+    events.push(event);
+    localStorage.setItem("shoplc_click_events_v1",JSON.stringify(events.slice(-250)));
+    window.dispatchEvent(new CustomEvent("controlphi:activity",{detail:{action:"shoplc-click",topic:event.itemId||event.id,quantId:event.quantId,page:location.pathname,at:new Date(event.at).toISOString(),source:"shoplc"}}));
+  }
+
+  async function handleShopLink(link){
+    let href=link.href;
+    const actionType=String(link.dataset.rewardAction||"").toLowerCase();
+    let itemId=String(link.dataset.itemId||"");
+    openInsideShopLc(href,actionType==="bid"?"Shop LC auction":"Shop LC shopping");
+
+    if(actionType==="buy"&&link.dataset.itemSource==="current-live"){
+      try{
+        const current=await currentLiveItem();
+        itemId=String(current.itemId||"");
+        href=String(current.href||href);
+      }catch(error){
+        trackClick(link,{actionType:"",itemId:""});
+        setRewardStatus("Shop LC opened, but the current product ID could not be verified, so no StarCoins were issued.","warn");
+        return;
+      }
+    }
+
+    trackClick(link,{actionType,itemId});
+    if(actionType&&itemId)await rewardShopLcClick({actionType,itemId,href});
+  }
+
+  document.addEventListener("click",event=>{
+    const link=event.target&&event.target.closest?event.target.closest("a.track"):null;
+    if(!link)return;
+    let url;
+    try{url=new URL(link.href,location.href)}catch(_){return}
+    if(!/(^|\.)shoplc\.com$/i.test(url.hostname))return;
+    event.preventDefault();
+    void handleShopLink(link);
+  },true);
+
+  async function loadFeaturedAuctions(){
+    if(!rewardAuctionGrid)return;
+    rewardAuctionGrid.innerHTML='<div class="reward-loading">Loading item-specific Shop LC auctions...</div>';
+    try{
+      const data=await publicLedger("/v1/shoplc/featured-auctions");
+      const auctions=Array.isArray(data.auctions)?data.auctions.slice(0,6):[];
+      if(!auctions.length){
+        rewardAuctionGrid.innerHTML='<div class="reward-loading">Open Browse auctions above; no item-specific auction links are available right now.</div>';
+        return;
+      }
+      rewardAuctionGrid.innerHTML=auctions.map((auction,index)=>{
+        const code=String(auction.auctionCode||"").replace(/[^A-Za-z0-9_-]/g,"");
+        const itemId=String(auction.itemId||"").replace(/[^A-Za-z0-9._:-]/g,"");
+        const href=String(auction.href||"").replace(/"/g,"%22");
+        return '<a class="shop-card track reward-link" data-track="featured-auction-'+(index+1)+'" data-reward-action="bid" data-item-id="'+itemId+'" href="'+href+'"><span>LIVE AUCTION · +5 STARCOINS</span><strong>Bid on item '+code.slice(0,10)+'</strong><p>One-time reward for this item-specific bid click. Shop LC handles the actual bid.</p><b>Bid on this item · +5 ⭐ →</b></a>';
+      }).join("");
+    }catch(error){
+      rewardAuctionGrid.innerHTML='<div class="reward-loading">Open Browse auctions above; item-specific reward links will appear when the Shop LC auction feed is available.</div>';
+    }
+  }
+
+  if(shopBrowserClose)shopBrowserClose.addEventListener("click",()=>{
+    if(shopFrame)shopFrame.src="about:blank";
+    if(shopBrowser)shopBrowser.hidden=true;
   });
 
-  function updateClock(){clock.textContent=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(new Date())+" local"}
+  function updateClock(){if(clock)clock.textContent=new Intl.DateTimeFormat("en-US",{hour:"numeric",minute:"2-digit"}).format(new Date())+" local"}
   function destroyHls(){if(hls){try{hls.destroy()}catch(_){}hls=null}}
   function setStatus(text){if(modeLabel)modeLabel.textContent=text}
-  function tryPlay(){const p=player.play();if(p&&typeof p.catch==="function")p.catch(()=>{})}
+  function tryPlay(){const p=player&&player.play();if(p&&typeof p.catch==="function")p.catch(()=>{})}
 
   function nextStream(){
     destroyHls();
@@ -33,17 +226,18 @@
       return;
     }
     streamIndex=(streamIndex+1)%STREAMS.length;
-    setStatus(`SHOP LC LIVE · SWITCHING FEED ${streamIndex+1}/${STREAMS.length}`);
+    setStatus("SHOP LC LIVE · SWITCHING FEED "+(streamIndex+1)+"/"+STREAMS.length);
     setTimeout(()=>loadStream(streamIndex),900);
   }
 
   function loadStream(index){
+    if(!player)return;
     const url=STREAMS[index];
     started=false;
     player.pause();
     player.removeAttribute("src");
     player.load();
-    setStatus(`SHOP LC LIVE · CONNECTING ${index+1}/${STREAMS.length}`);
+    setStatus("SHOP LC LIVE · CONNECTING "+(index+1)+"/"+STREAMS.length);
 
     if(player.canPlayType("application/vnd.apple.mpegurl")){
       player.src=url;
@@ -68,11 +262,13 @@
     setStatus("LIVE STREAM NEEDS A MODERN BROWSER");
   }
 
-  player.addEventListener("playing",()=>{started=true;failedFeeds=0;setStatus("SHOP LC LIVE BROADCAST")});
-  player.addEventListener("stalled",()=>{if(started&&hls){try{hls.startLoad()}catch(_){}}});
-  player.addEventListener("error",()=>{if(!hls)nextStream()});
+  if(player){
+    player.addEventListener("playing",()=>{started=true;failedFeeds=0;setStatus("SHOP LC LIVE BROADCAST")});
+    player.addEventListener("stalled",()=>{if(started&&hls){try{hls.startLoad()}catch(_){}}});
+    player.addEventListener("error",()=>{if(!hls)nextStream()});
+  }
 
-  soundButton.addEventListener("click",()=>{
+  if(soundButton)soundButton.addEventListener("click",()=>{
     player.muted=!player.muted;
     if(!player.muted){player.volume=1;soundButton.textContent="Sound on";tryPlay();setTimeout(()=>soundButton.remove(),1200)}
     else soundButton.textContent="Tap for sound";
@@ -80,22 +276,31 @@
 
   function localShareCredit(reference){
     const profile=parse("starquest_guest_profile_v1",{tokens:0,shareCount:0,pendingShareCredits:0,shareEvents:[],ledger:[]});
-    profile.tokens=Math.max(0,Number(profile.tokens)||0);profile.shareCount=Math.max(0,Number(profile.shareCount)||0)+1;profile.pendingShareCredits=Math.max(0,Number(profile.pendingShareCredits)||0)+1;
-    let awarded=0;while(profile.pendingShareCredits>=10){profile.pendingShareCredits-=10;profile.tokens+=1;awarded+=1}
-    const id=`shoplc-share-${Date.now().toString(36)}`;
+    profile.tokens=Math.max(0,Number(profile.tokens)||0);
+    profile.shareCount=Math.max(0,Number(profile.shareCount)||0)+1;
+    profile.pendingShareCredits=Math.max(0,Number(profile.pendingShareCredits)||0)+1;
+    let awarded=0;
+    while(profile.pendingShareCredits>=10){profile.pendingShareCredits-=10;profile.tokens+=1;awarded+=1}
+    const id="shoplc-share-"+Date.now().toString(36);
     profile.shareEvents=(profile.shareEvents||[]).concat({id,contentId:reference,confirmed:true,createdAt:Date.now()}).slice(-250);
-    profile.ledger=(profile.ledger||[]).concat({id:`tx-${id}`,type:awarded?"share_reward":"share_credit",amount:awarded,balance:profile.tokens,pendingShareCredits:profile.pendingShareCredits,createdAt:Date.now()}).slice(-500);
+    profile.ledger=(profile.ledger||[]).concat({id:"tx-"+id,type:awarded?"share_reward":"share_credit",amount:awarded,balance:profile.tokens,pendingShareCredits:profile.pendingShareCredits,createdAt:Date.now()}).slice(-500);
     localStorage.setItem("starquest_guest_profile_v1",JSON.stringify(profile));
+    window.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-share"}}));
     return{awarded,progressToNextCoin:profile.pendingShareCredits};
   }
 
-  shareButton.addEventListener("click",async()=>{
+  if(shareButton)shareButton.addEventListener("click",async()=>{
     const data={title:"ShopLC Live Companion",text:"Watch Shop LC live with current shopping links, offers, auctions, and deals.",url:location.href};
     if(!navigator.share){try{await navigator.clipboard.writeText(data.url);shareStatus.textContent="Link copied."}catch(_){shareStatus.textContent="Sharing unavailable."}return}
-    try{await navigator.share(data);const r=localShareCredit(data.url);shareStatus.textContent=r.awarded?"Shared · 1 StarCoin completed!":`Shared · StarCoin progress ${r.progressToNextCoin}/10`}catch(e){if(!e||e.name!=="AbortError")shareStatus.textContent="Share did not complete."}
+    try{
+      await navigator.share(data);
+      const r=localShareCredit(data.url);
+      shareStatus.textContent=r.awarded?"Shared · 1 StarCoin completed!":"Shared · StarCoin progress "+r.progressToNextCoin+"/10";
+    }catch(e){if(!e||e.name!=="AbortError")shareStatus.textContent="Share did not complete."}
   });
 
-  updateClock();setInterval(updateClock,1000);
-  player.muted=true;
-  loadStream(0);
+  updateClock();
+  setInterval(updateClock,1000);
+  if(player){player.muted=true;loadStream(0)}
+  void loadFeaturedAuctions();
 })();
