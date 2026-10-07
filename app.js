@@ -9,7 +9,7 @@
   let streamIndex=0,hls=null,started=false,recoveries=0,failedFeeds=0;
   const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
 
-  document.querySelectorAll("a.track").forEach(link=>{
+  function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key))||fallback}catch(_){return fallback}}\n\n  document.querySelectorAll("a.track").forEach(link=>{
     link.addEventListener("click",()=>{
       const events=parse("shoplc_click_events_v1",[]);
       events.push({id:link.dataset.track||"link",href:link.href,at:Date.now()});
