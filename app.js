@@ -126,7 +126,7 @@
   async function rewardShopLcClick({actionType,itemId,href}){
     const token=deviceToken();
     if(!token){
-      setRewardStatus("Shop LC opened, but this StarCoin wallet is not connected to the cloud ledger yet.","warn");
+      setRewardStatus("Shop LC opened, but this Star Coin wallet is not connected to the cloud ledger yet.","warn");
       return null;
     }
     setRewardStatus("Recording the item click and checking the 3-per-day limit...","pending");
@@ -144,18 +144,18 @@
     });
     const data=await response.json().catch(()=>({}));
     if(!response.ok||!data.ok){
-      setRewardStatus(data.message||"The StarCoin ledger did not accept this click.","error");
+      setRewardStatus(data.message||"The Star Coin ledger did not accept this click.","error");
       return null;
     }
     applyCloudStarState(data.state);
     if(data.credited){
-      setRewardStatus("+5 StarCoins credited. "+data.remainingToday+" rewarded item"+(data.remainingToday===1?"":"s")+" left today.","ok");
+      setRewardStatus("+5 Star Coins credited. "+data.remainingToday+" rewarded item"+(data.remainingToday===1?"":"s")+" left today.","ok");
     }else if(data.reason==="item_already_rewarded"){
-      setRewardStatus("This Shop LC item already paid its one-time 5 StarCoin reward.","info");
+      setRewardStatus("This Shop LC item already paid its one-time 5 Star Coin reward.","info");
     }else if(data.reason==="daily_limit"){
       setRewardStatus("Daily reward limit reached: 3 Shop LC items today.","info");
     }else{
-      setRewardStatus("This click was already recorded; no duplicate StarCoins were added.","info");
+      setRewardStatus("This click was already recorded; no duplicate Star Coins were added.","info");
     }
     return data;
   }
@@ -236,7 +236,7 @@
         trackClick(link,{actionType:"browse",itemId:product.itemId,title:product.title});
         try{await storeShopLcClick(product,"browse")}catch(_){}
         openSafeProduct(product,"browse");
-        setRewardStatus("The live product details could not be verified, so no StarCoins were issued for this click.","warn");
+        setRewardStatus("The live product details could not be verified, so no Star Coins were issued for this click.","warn");
         return;
       }
     }else if(actionType==="bid"){
@@ -278,7 +278,7 @@
         const code=String(auction.auctionCode||"").replace(/[^A-Za-z0-9_-]/g,"");
         const itemId=String(auction.itemId||"").replace(/[^A-Za-z0-9._:-]/g,"");
         const href=String(auction.href||"").replace(/"/g,"%22");
-        return '<a class="shop-card track reward-link" data-track="featured-auction-'+(index+1)+'" data-reward-action="bid" data-item-id="'+itemId+'" href="'+href+'"><span>LIVE AUCTION · +5 STARCOINS</span><strong>Bid on item '+code.slice(0,10)+'</strong><p>One-time reward for this item-specific bid click. Shop LC handles the actual bid.</p><b>Bid on this item · +5 ⭐ →</b></a>';
+        return '<a class="shop-card track reward-link" data-track="featured-auction-'+(index+1)+'" data-reward-action="bid" data-item-id="'+itemId+'" href="'+href+'"><span>LIVE AUCTION · +5 STAR COINS</span><strong>Bid on item '+code.slice(0,10)+'</strong><p>One-time reward for this item-specific bid click. Shop LC handles the actual bid.</p><b>Bid on this item · +5 ⭐ →</b></a>';
       }).join("");
     }catch(error){
       rewardAuctionGrid.innerHTML='<div class="reward-loading">Open Browse auctions above; item-specific reward links will appear when the Shop LC auction feed is available.</div>';
@@ -375,7 +375,7 @@
     try{
       await navigator.share(data);
       const r=localShareCredit(data.url);
-      shareStatus.textContent=r.awarded?"Shared · 1 StarCoin completed!":"Shared · StarCoin progress "+r.progressToNextCoin+"/10";
+      shareStatus.textContent=r.awarded?"Shared · 1 Star Coin completed!":"Shared · Star Coin progress "+r.progressToNextCoin+"/10";
     }catch(e){if(!e||e.name!=="AbortError")shareStatus.textContent="Share did not complete."}
   });
 
