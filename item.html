@@ -1,0 +1,60 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#120a1d">
+  <title>ShopLC Safe Product</title>
+  <style>
+    :root{color-scheme:dark;--bg:#09060f;--panel:#171020;--line:#3a2d49;--text:#fff8ff;--muted:#baaac7;--pink:#ff4fa3;--gold:#ffd979;--green:#69f0b0;--blue:#7fc8ff}
+    *{box-sizing:border-box}body{margin:0;background:radial-gradient(circle at top,#2a1238,#09060f 56%);color:var(--text);font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;min-height:100vh}
+    main{width:min(820px,calc(100% - 24px));margin:auto;padding:18px 0 34px}.top{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:14px}.back{border:1px solid var(--line);background:#171020;color:#fff;border-radius:12px;padding:10px 14px;font-weight:850}.saved{color:var(--green);font-size:.82rem;font-weight:900}
+    .card{border:1px solid var(--line);background:linear-gradient(150deg,#21162d,#100a16);border-radius:24px;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.34)}.media{background:#fff;min-height:180px;display:grid;place-items:center}.media img{display:block;max-width:100%;max-height:430px;object-fit:contain}.media .fallback{color:#33213f;font-weight:900;padding:50px 20px;text-align:center}
+    .content{padding:20px}.eyebrow{color:var(--gold);font-size:.74rem;font-weight:900;letter-spacing:.12em}.content h1{font-size:clamp(1.35rem,5vw,2.25rem);line-height:1.08;margin:8px 0}.price{font-size:1.5rem;font-weight:950;margin:8px 0 14px}.chips{display:flex;flex-wrap:wrap;gap:7px;margin:12px 0 18px}.chip{padding:7px 10px;border-radius:999px;border:1px solid var(--line);background:#100a16;color:#eee;font-size:.82rem}.actions{display:grid;grid-template-columns:1fr 1fr;gap:10px}.actions a{min-height:50px;border-radius:14px;display:flex;align-items:center;justify-content:center;padding:10px 14px;font-weight:950;text-decoration:none;text-align:center}.shoplc{background:linear-gradient(135deg,var(--pink),#9c55ff);color:white}.ebay{background:#fff;color:#170b21}.note{color:var(--muted);font-size:.82rem;line-height:1.5;margin-top:14px}.quant{margin-top:14px;padding:12px;border:1px dashed var(--line);border-radius:14px;color:var(--muted);font-size:.78rem;word-break:break-word}
+    @media(max-width:600px){.actions{grid-template-columns:1fr}.content{padding:16px}.card{border-radius:18px}}
+  </style>
+</head>
+<body>
+<main>
+  <div class="top"><button class="back" id="back" type="button">← Back</button><span class="saved">CLICK SAVED TO STARQUEST</span></div>
+  <article class="card">
+    <div class="media" id="media"></div>
+    <div class="content">
+      <div class="eyebrow">SHOPLC SAFE PRODUCT PAGE</div>
+      <h1 id="title">Shop LC item</h1>
+      <div class="price" id="price"></div>
+      <div class="chips" id="chips"></div>
+      <div class="actions">
+        <a class="shoplc" id="shoplc" target="_blank" rel="noopener noreferrer">Continue to Shop LC</a>
+        <a class="ebay" id="ebay" target="_blank" rel="noopener noreferrer">Find similar on eBay</a>
+      </div>
+      <p class="note">The product click and its attributes were saved before this page opened. Shop LC handles sign-in, bidding, checkout, payment, fulfillment and returns. Opening Shop LC in a separate page cannot erase the Quant-linked click record already stored in Cloudflare.</p>
+      <div class="quant" id="quant"></div>
+    </div>
+  </article>
+</main>
+<script>
+(function(){
+  const q=new URLSearchParams(location.search);
+  const get=k=>String(q.get(k)||"").trim();
+  const title=get("title")||"Shop LC item";
+  const image=get("image");
+  const href=get("href")||"https://www.shoplc.com/";
+  const price=get("price");
+  const category=get("category"),gemstone=get("gemstone"),ringSize=get("ringSize"),metal=get("metal"),style=get("style"),code=get("code"),quantId=get("quantId");
+  document.getElementById("title").textContent=title;
+  document.title=title+" · ShopLC Safe";
+  const priceEl=document.getElementById("price");priceEl.textContent=price?"$"+Number(price).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2}):"";
+  const media=document.getElementById("media");
+  if(image){const img=document.createElement("img");img.src=image;img.alt=title;img.onerror=()=>{media.innerHTML='<div class="fallback">Shop LC product</div>'};media.appendChild(img)}else media.innerHTML='<div class="fallback">Shop LC product</div>';
+  const attrs=[["Product",code],["Category",category],["Gemstone",gemstone],["Ring size",ringSize],["Metal",metal],["Style",style]].filter(x=>x[1]);
+  document.getElementById("chips").innerHTML=attrs.map(x=>'<span class="chip">'+x[0]+': '+String(x[1]).replace(/[<>&"]/g,"")+'</span>').join("");
+  document.getElementById("shoplc").href=href;
+  const terms=[gemstone,category,ringSize?("size "+ringSize):"",style,metal].filter(Boolean).join(" ");
+  document.getElementById("ebay").href="https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(terms||title);
+  document.getElementById("quant").textContent=quantId?"Linked Quant: "+quantId:"No active Quant ID was available for this click.";
+  document.getElementById("back").onclick=()=>history.length>1?history.back():location.replace("./");
+})();
+</script>
+</body>
+</html>
