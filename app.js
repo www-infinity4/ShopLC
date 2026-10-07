@@ -13,11 +13,14 @@
   let streamIndex=0,hls=null,started=false,recoveries=0,failedFeeds=0;
   const player=$("player"),clock=$("stationClock"),soundButton=$("soundButton"),shareButton=$("shareButton"),shareStatus=$("shareStatus"),modeLabel=$("modeLabel");
   const rewardStatus=$("rewardStatus"),rewardAuctionGrid=$("rewardAuctionGrid");
-  const shopBrowser=$("shopBrowser"),shopFrame=$("shopFrame"),shopBrowserTitle=$("shopBrowserTitle"),shopBrowserClose=$("shopBrowserClose");
+  const shopBrowser=$("shopBrowser"),shopSafeProduct=$("shopSafeProduct"),shopBrowserTitle=$("shopBrowserTitle"),shopBrowserClose=$("shopBrowserClose");
 
   function parse(key,fallback){try{return JSON.parse(localStorage.getItem(key))??fallback}catch(_){return fallback}}
   function write(key,value){try{localStorage.setItem(key,JSON.stringify(value));return true}catch(_){return false}}
   function uid(prefix){try{return prefix+"-"+crypto.randomUUID()}catch(_){return prefix+"-"+Date.now().toString(36)+"-"+Math.random().toString(36).slice(2)}}
+
+  function esc(value){return String(value??"").replace(/[&<>"']/g,ch=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#39;"}[ch]))}
+  function safeHttp(value,fallback){try{const u=new URL(String(value||""),location.href);return /^https?:$/.test(u.protocol)?u.href:fallback}catch(_){return fallback}}
 
   function tokenFrom(raw){
     if(/^sq_[A-Za-z0-9_-]{32,}$/.test(String(raw||"")))return String(raw);
@@ -158,27 +161,40 @@
   }
 
   function openSafeProduct(product,actionType){
-    if(!shopBrowser||!shopFrame)return;
-    const safe=new URL("item.html",location.href);
-    const params={
-      title:product.title||"Shop LC item",
-      href:product.href||"https://www.shoplc.com/",
-      image:product.image||"",
-      price:product.price||"",
-      category:product.category||"",
-      gemstone:product.gemstone||"",
-      ringSize:product.ringSize||"",
-      metal:product.metal||"",
-      style:product.style||"",
-      code:product.productCode||String(product.itemId||"").replace(/^[^:]+:/,""),
-      itemId:product.itemId||"",
-      actionType:actionType||"view",
-      quantId:activeQuantId()
-    };
-    for(const [key,value] of Object.entries(params))if(String(value||""))safe.searchParams.set(key,String(value));
+    if(!shopBrowser||!shopSafeProduct)return;
+    const isBuy=actionType==="buy";
+    const isBid=actionType==="bid";
+    const shopHref=isBuy
+      ?"https://www.shoplc.com/pages/live-tv"
+      :safeHttp(product.href,"https://www.shoplc.com/");
+    const title=String(product.title||"Shop LC item").trim();
+    const image=safeHttp(product.image,"");
+    const price=Number(product.price)||0;
+    const code=String(product.productCode||product.itemId||"").replace(/^[^:]+:/,"");
+    const attrs=[
+      ["Product",code],["Category",product.category],["Gemstone",product.gemstone],
+      ["Ring size",product.ringSize],["Metal",product.metal],["Style",product.style]
+    ].filter(([,value])=>String(value||"").trim());
+    const terms=[product.gemstone,product.category,product.ringSize?("size "+product.ringSize):"",product.style,product.metal].filter(Boolean).join(" ");
+    const ebayHref="https://www.ebay.com/sch/i.html?_nkw="+encodeURIComponent(terms||title);
+    shopSafeProduct.innerHTML=
+      '<article class="safe-card">'+
+        '<div class="safe-media">'+(image?'<img src="'+esc(image)+'" alt="'+esc(title)+'">':'<div class="safe-fallback">Shop LC product</div>')+'</div>'+
+        '<div class="safe-body">'+
+          '<div class="safe-kicker">SHOPLC SAFE PRODUCT</div>'+
+          '<h2 class="safe-title">'+esc(title)+'</h2>'+
+          (price?'<div class="safe-price">$'+price.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})+'</div>':'')+
+          '<div class="safe-chips">'+attrs.map(([label,value])=>'<span class="safe-chip">'+esc(label)+': '+esc(value)+'</span>').join("")+'</div>'+
+          '<div class="safe-actions">'+
+            '<a class="safe-shoplc" href="'+esc(shopHref)+'" target="_blank" rel="noopener noreferrer">'+(isBid?'Continue to Shop LC auction':'Continue to Shop LC live item')+'</a>'+
+            '<a class="safe-ebay" href="'+esc(ebayHref)+'" target="_blank" rel="noopener noreferrer">Find similar on eBay</a>'+
+          '</div>'+
+          '<p class="safe-note">This product click was recorded before this card opened. '+(isBuy?'The Shop LC button opens the known-good live shopping page, where the current on-air item can be purchased.':'Shop LC handles the actual transaction.')+'</p>'+
+          '<div class="safe-quant">'+(activeQuantId()?'Linked Quant: '+esc(activeQuantId()):'No active Quant ID was available for this click.')+'</div>'+
+        '</div>'+
+      '</article>';
     shopBrowser.hidden=false;
-    shopFrame.src=safe.href;
-    if(shopBrowserTitle)shopBrowserTitle.textContent=product.title||"Shop LC safe product";
+    if(shopBrowserTitle)shopBrowserTitle.textContent=title;
     shopBrowser.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
@@ -270,7 +286,7 @@
   }
 
   if(shopBrowserClose)shopBrowserClose.addEventListener("click",()=>{
-    if(shopFrame)shopFrame.src="about:blank";
+    if(shopSafeProduct)shopSafeProduct.replaceChildren();
     if(shopBrowser)shopBrowser.hidden=true;
   });
 
