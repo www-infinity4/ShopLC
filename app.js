@@ -250,7 +250,13 @@
     }catch(error){
       console.warn("ShopLC cloud click storage:",error);
     }
-    if(actionType&&product.itemId)await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});
+    if(actionType&&product.itemId){
+      try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});}
+      catch(error){
+        console.warn("ShopLC reward request deferred:",error);
+        setRewardStatus("Shopping opened, but the cloud ledger could not confirm a Star Coin reward. No coins were added; please retry after reconnecting.","warn");
+      }
+    }
     openSafeProduct(product,actionType||"browse");
   }
 
