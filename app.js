@@ -213,7 +213,8 @@
       ringSize:extra.ringSize||""
     };
     events.push(event);
-    localStorage.setItem("shoplc_click_events_v1",JSON.stringify(events.slice(-250)));
+    try{localStorage.setItem("shoplc_click_events_v1",JSON.stringify(events.slice(-250)));}
+    catch(error){console.warn("ShopLC local click history unavailable; cloud reward can continue",error);}
     window.dispatchEvent(new CustomEvent("controlphi:activity",{detail:{action:"shoplc-click",topic:event.itemId||event.id,quantId:event.quantId,page:location.pathname,at:new Date(event.at).toISOString(),source:"shoplc"}}));
   }
 
