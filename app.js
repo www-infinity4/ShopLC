@@ -123,8 +123,13 @@
     return data;
   }
 
-  async function rewardShopLcClick({actionType,itemId,href}){
-    const token=deviceToken();
+  const REWARD_QUEUE="shoplc:pending-reward-receipts:v1";
+  let rewardSyncing=false;
+  async function rewardShopLcClick({actionType,itemId,href,clickId},retry=false){
+    const intent={actionType,itemId,href,clickId:clickId||uid("shoplc-click"),quantId:activeQuantId()};
+    if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.itemId===itemId&&x.actionType===actionType)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.itemId===itemId&&x.actionType===actionType));}
+    let token=deviceToken();
+    if(!token&&window.QuantaCloudConnection?.resolveDeviceToken)token=await window.QuantaCloudConnection.resolveDeviceToken();
     if(!token){
       setRewardStatus("Shop LC opened, but this Star Coin wallet is not connected to the cloud ledger yet.","warn");
       return null;
@@ -134,11 +139,7 @@
       method:"POST",
       headers:{"Authorization":"Bearer "+token,"Content-Type":"application/json"},
       body:JSON.stringify({
-        clickId:uid("shoplc-click"),
-        actionType,
-        itemId,
-        href,
-        quantId:activeQuantId()
+        ...intent
       }),
       cache:"no-store"
     });
@@ -147,7 +148,9 @@
       setRewardStatus(data.message||"The Star Coin ledger did not accept this click.","error");
       return null;
     }
+    write(REWARD_QUEUE,parse(REWARD_QUEUE,[]).filter(x=>x.clickId!==intent.clickId));
     applyCloudStarState(data.state);
+    void window.ControlPhi?.refreshCloudWallet?.();
     if(data.credited){
       setRewardStatus("+5 Star Coins credited. "+data.remainingToday+" rewarded item"+(data.remainingToday===1?"":"s")+" left today.","ok");
     }else if(data.reason==="item_already_rewarded"){
@@ -159,6 +162,15 @@
     }
     return data;
   }
+
+  async function flushRewardQueue(){
+    if(rewardSyncing)return;rewardSyncing=true;
+    try{for(const intent of parse(REWARD_QUEUE,[]).slice(0,20)){const result=await rewardShopLcClick(intent,true);if(!result)break}}catch(error){console.warn("ShopLC reward saved for retry",error)}finally{rewardSyncing=false}
+  }
+  for(const event of ["online","focus"])window.addEventListener(event,flushRewardQueue);
+  document.addEventListener("starquest:ledger-connected",flushRewardQueue);
+  setInterval(()=>{if(!document.hidden)void flushRewardQueue()},45000);
+  void flushRewardQueue();
 
   function openSafeProduct(product,actionType){
     if(!shopBrowser||!shopSafeProduct)return;
@@ -255,7 +267,7 @@
       try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});}
       catch(error){
         console.warn("ShopLC reward request deferred:",error);
-        setRewardStatus("Shopping opened, but the cloud ledger could not confirm a Star Coin reward. No coins were added; please retry after reconnecting.","warn");
+        setRewardStatus("Shopping opened, but the cloud ledger could not confirm a Star Coin reward. The click receipt is saved for retry; the ledger will prevent duplicate payouts.","warn");
       }
     }
     openSafeProduct(product,actionType||"browse");
