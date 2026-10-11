@@ -75,6 +75,14 @@
       write("starquest_guest_profile_v1",guest);
     }
     window.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-cloud",state}}));
+    // Same-origin QuantaPhi viewer: refresh the parent wallet too, without
+    // revealing wallet credentials or pretending that a failed click was paid.
+    try{
+      if(window.parent!==window&&window.parent.location.origin===location.origin){
+        window.parent.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-cloud-confirmed"}}));
+        void window.parent.ControlPhi?.refreshCloudWallet?.();
+      }
+    }catch(_){} 
   }
 
   function setRewardStatus(message,kind){
@@ -94,11 +102,11 @@
     return publicLedger("/v1/shoplc/current-item");
   }
 
-  async function storeShopLcClick(product,actionType){
+  async function storeShopLcClick(product,actionType,clickId){
     const token=deviceToken();
     if(!token)return null;
     const payload={
-      clickId:uid("shoplc-signal"),
+      clickId:clickId||uid("shoplc-signal"),
       itemId:String(product.itemId||""),
       href:String(product.href||"https://www.shoplc.com/"),
       title:String(product.title||""),
@@ -127,7 +135,7 @@
   let rewardSyncing=false;
   async function rewardShopLcClick({actionType,itemId,href,clickId},retry=false){
     const intent={actionType,itemId,href,clickId:clickId||uid("shoplc-click"),quantId:activeQuantId()};
-    if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.itemId===itemId&&x.actionType===actionType)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.itemId===itemId&&x.actionType===actionType));}
+    if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.clickId===intent.clickId)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.clickId===intent.clickId));}
     let token=deviceToken();
     if(!token&&window.QuantaCloudConnection?.resolveDeviceToken)token=await window.QuantaCloudConnection.resolveDeviceToken();
     if(!token){
@@ -231,6 +239,7 @@
   }
 
   async function handleShopLink(link){
+    const clickId=uid("shoplc-click");
     let href=link.href;
     const actionType=String(link.dataset.rewardAction||"").toLowerCase();
     let itemId=String(link.dataset.itemId||"");
@@ -247,7 +256,7 @@
         product={...product,...current,href:String(current.href||href),itemId:String(current.itemId||product.itemId)};
       }catch(error){
         trackClick(link,{actionType:"browse",itemId:product.itemId,title:product.title});
-        try{await storeShopLcClick(product,"browse")}catch(_){}
+        try{await storeShopLcClick(product,"browse",clickId)}catch(_){}
         openSafeProduct(product,"browse");
         setRewardStatus("The live product details could not be verified, so no Star Coins were issued for this click.","warn");
         return;
@@ -259,12 +268,12 @@
 
     trackClick(link,{actionType:actionType||"browse",itemId:product.itemId,title:product.title,gemstone:product.gemstone||"",ringSize:product.ringSize||""});
     try{
-      await storeShopLcClick(product,actionType||"browse");
+      await storeShopLcClick(product,actionType||"browse",clickId);
     }catch(error){
       console.warn("ShopLC cloud click storage:",error);
     }
     if(actionType&&product.itemId){
-      try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});}
+      try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href,clickId});}
       catch(error){
         console.warn("ShopLC reward request deferred:",error);
         setRewardStatus("Shopping opened, but the cloud ledger could not confirm a Star Coin reward. The click receipt is saved for retry; the ledger will prevent duplicate payouts.","warn");
