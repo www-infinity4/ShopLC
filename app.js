@@ -94,7 +94,7 @@
     return publicLedger("/v1/shoplc/current-item");
   }
 
-  async function storeShopLcClick(product,actionType){
+  async function storeShopLcClick(product,actionType,clickId){
     const token=deviceToken();
     if(!token)return null;
     const payload={
