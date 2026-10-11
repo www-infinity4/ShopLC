@@ -20,5 +20,21 @@ test('each intentional click is preserved for retry instead of reusing the previ
 test('visible reward confirmation and cache-busted ShopLC script remain in viewer',()=>{
  assert.equal((html.match(/id="rewardStatus"/g)||[]).length,1);
  assert.ok(html.indexOf('id="rewardStatus"')>html.indexOf('Buy this item'));
- assert.match(html,/app\.js\?v=20261011-shared-receipt1/);
+ assert.match(html,/app\.js\?v=20261011-wallet-readback2/);
+});
+
+test('confirmed 5-StarCoin message requires authenticated same-click wallet ledger readback',()=>{
+ assert.match(s,/async function readBackShopLcReward\(clickId,token\)/);
+ assert.match(s,/LEDGER_ENDPOINT\+"\/v1\/state"/);
+ assert.match(s,/Authorization":"Bearer "\+token/);
+ assert.match(s,/entry\.referenceId===clickId/);
+ assert.match(s,/entry\.type==="shoplc_click_reward"/);
+ assert.match(s,/Number\(entry\.amount\)===5/);
+ assert.match(s,/entry\.payoutStatus==="credited_click_reward"/);
+ assert.match(s,/if\(!proof\.confirmed\)/);
+ assert.match(s,/applyCloudStarState\(proof\.state\)/);
+ assert.match(s,/StarCoins VERIFIED in the connected StarQuest wallet/);
+ assert.match(s,/wallet_account_mismatch/);
+ assert.match(s,/No additional reward was issued; the robot will audit/);
+ assert.doesNotMatch(s,/setRewardStatus\("\+5 Star Coins credited/);
 });

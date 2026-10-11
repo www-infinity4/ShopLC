@@ -133,6 +133,24 @@
 
   const REWARD_QUEUE="shoplc:pending-reward-receipts:v1";
   let rewardSyncing=false;
+  async function readBackShopLcReward(clickId,token){
+    const response=await fetch(LEDGER_ENDPOINT+"/v1/state",{
+      headers:{"Authorization":"Bearer "+token},
+      cache:"no-store",
+      signal:AbortSignal.timeout(15000)
+    });
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok||!result.ok||!result.state)throw Error(String(result.message||result.error||"wallet_readback_unavailable"));
+    const state=result.state;
+    const session=parse("starquest_session",null);
+    const selected=String(session?.key||session?.username||"").trim().toLowerCase();
+    if(selected&&String(state.username||"").trim().toLowerCase()!==selected)throw Error("wallet_account_mismatch");
+    const confirmed=Array.isArray(state.ledger)&&state.ledger.some(entry=>
+      entry.type==="shoplc_click_reward"&&entry.referenceId===clickId&&Number(entry.amount)===5&&
+      entry.payoutStatus==="credited_click_reward");
+    return {confirmed,state};
+  }
+
   async function rewardShopLcClick({actionType,itemId,href,clickId},retry=false){
     const intent={actionType,itemId,href,clickId:clickId||uid("shoplc-click"),quantId:activeQuantId()};
     if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.clickId===intent.clickId)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.clickId===intent.clickId));}
@@ -157,16 +175,29 @@
       return null;
     }
     write(REWARD_QUEUE,parse(REWARD_QUEUE,[]).filter(x=>x.clickId!==intent.clickId));
-    applyCloudStarState(data.state);
-    void window.ControlPhi?.refreshCloudWallet?.();
     if(data.credited){
-      setRewardStatus("+5 Star Coins credited. "+data.remainingToday+" rewarded item"+(data.remainingToday===1?"":"s")+" left today.","ok");
-    }else if(data.reason==="item_already_rewarded"){
-      setRewardStatus("This Shop LC item already paid its one-time 5 Star Coin reward.","info");
-    }else if(data.reason==="daily_limit"){
-      setRewardStatus("Daily reward limit reached: 3 Shop LC items today.","info");
+      setRewardStatus("StarQuest accepted +5 StarCoins. Checking the wallet ledger entry...","pending");
+      try{
+        const proof=await readBackShopLcReward(intent.clickId,token);
+        if(!proof.confirmed){
+          setRewardStatus("StarQuest reported +5, but the matching wallet receipt is not confirmed yet. Robot Brain will audit this click.","warn");
+        }else{
+          applyCloudStarState(proof.state);
+          void window.ControlPhi?.refreshCloudWallet?.();
+          try{void window.parent?.ControlPhi?.refreshCloudWallet?.()}catch(_){}
+          setRewardStatus("+5 StarCoins VERIFIED in the connected StarQuest wallet. Balance: "+Number(proof.state.starCoins)+". "+data.remainingToday+" rewarded click"+(data.remainingToday===1?"":"s")+" left today.","ok");
+        }
+      }catch(error){
+        setRewardStatus("StarQuest accepted +5, but wallet readback is unavailable ("+String(error?.message||error).slice(0,75)+"). No additional reward was issued; the robot will audit the receipt.","warn");
+      }
     }else{
-      setRewardStatus("This click was already recorded; no duplicate Star Coins were added.","info");
+      if(data.state)applyCloudStarState(data.state);
+      void window.ControlPhi?.refreshCloudWallet?.();
+      if(data.reason==="daily_limit"){
+        setRewardStatus("Daily reward limit reached: 3 verified ShopLC clicks today.","info");
+      }else{
+        setRewardStatus("This click was already recorded or not eligible; no duplicate StarCoins were added.","info");
+      }
     }
     return data;
   }
