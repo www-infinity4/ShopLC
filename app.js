@@ -98,7 +98,7 @@
     const token=deviceToken();
     if(!token)return null;
     const payload={
-      clickId:uid("shoplc-signal"),
+      clickId:clickId||uid("shoplc-signal"),
       itemId:String(product.itemId||""),
       href:String(product.href||"https://www.shoplc.com/"),
       title:String(product.title||""),
@@ -231,6 +231,7 @@
   }
 
   async function handleShopLink(link){
+    const clickId=uid("shoplc-click");
     let href=link.href;
     const actionType=String(link.dataset.rewardAction||"").toLowerCase();
     let itemId=String(link.dataset.itemId||"");
@@ -247,7 +248,7 @@
         product={...product,...current,href:String(current.href||href),itemId:String(current.itemId||product.itemId)};
       }catch(error){
         trackClick(link,{actionType:"browse",itemId:product.itemId,title:product.title});
-        try{await storeShopLcClick(product,"browse")}catch(_){}
+        try{await storeShopLcClick(product,"browse",clickId)}catch(_){}
         openSafeProduct(product,"browse");
         setRewardStatus("The live product details could not be verified, so no Star Coins were issued for this click.","warn");
         return;
@@ -259,12 +260,12 @@
 
     trackClick(link,{actionType:actionType||"browse",itemId:product.itemId,title:product.title,gemstone:product.gemstone||"",ringSize:product.ringSize||""});
     try{
-      await storeShopLcClick(product,actionType||"browse");
+      await storeShopLcClick(product,actionType||"browse",clickId);
     }catch(error){
       console.warn("ShopLC cloud click storage:",error);
     }
     if(actionType&&product.itemId){
-      try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href});}
+      try{await rewardShopLcClick({actionType,itemId:product.itemId,href:product.href,clickId});}
       catch(error){
         console.warn("ShopLC reward request deferred:",error);
         setRewardStatus("Shopping opened, but the cloud ledger could not confirm a Star Coin reward. The click receipt is saved for retry; the ledger will prevent duplicate payouts.","warn");
