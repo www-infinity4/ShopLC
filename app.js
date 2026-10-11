@@ -127,7 +127,7 @@
   let rewardSyncing=false;
   async function rewardShopLcClick({actionType,itemId,href,clickId},retry=false){
     const intent={actionType,itemId,href,clickId:clickId||uid("shoplc-click"),quantId:activeQuantId()};
-    if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.itemId===itemId&&x.actionType===actionType)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.itemId===itemId&&x.actionType===actionType));}
+    if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.clickId===intent.clickId)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.clickId===intent.clickId));}
     let token=deviceToken();
     if(!token&&window.QuantaCloudConnection?.resolveDeviceToken)token=await window.QuantaCloudConnection.resolveDeviceToken();
     if(!token){
