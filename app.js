@@ -75,6 +75,14 @@
       write("starquest_guest_profile_v1",guest);
     }
     window.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-cloud",state}}));
+    // Same-origin QuantaPhi viewer: refresh the parent wallet too, without
+    // revealing wallet credentials or pretending that a failed click was paid.
+    try{
+      if(window.parent!==window&&window.parent.location.origin===location.origin){
+        window.parent.dispatchEvent(new CustomEvent("controlphi:wallet-change",{detail:{source:"shoplc-cloud-confirmed"}}));
+        void window.parent.ControlPhi?.refreshCloudWallet?.();
+      }
+    }catch(_){} 
   }
 
   function setRewardStatus(message,kind){
