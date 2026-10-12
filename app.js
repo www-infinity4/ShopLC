@@ -102,8 +102,20 @@
     return publicLedger("/v1/shoplc/current-item");
   }
 
+  async function resolveRewardToken(){
+    // The embedded viewer shares only a same-origin parent's trusted bridge.
+    let host=window;
+    try{if(window.parent!==window&&window.parent.location.origin===location.origin)host=window.parent}catch(_){}
+    const bridge=host.QuantaCloudConnection||window.QuantaCloudConnection;
+    if(typeof bridge?.resolveDeviceToken==="function"){
+      const token=await bridge.resolveDeviceToken();
+      if(tokenFrom(token))return token;
+    }
+    return deviceToken();
+  }
+
   async function storeShopLcClick(product,actionType,clickId){
-    const token=deviceToken();
+    const token=await resolveRewardToken();
     if(!token)return null;
     const payload={
       clickId:clickId||uid("shoplc-signal"),
@@ -143,7 +155,8 @@
     if(!response.ok||!result.ok||!result.state)throw Error(String(result.message||result.error||"wallet_readback_unavailable"));
     const state=result.state;
     const session=parse("starquest_session",null);
-    const selected=String(session?.key||session?.username||"").trim().toLowerCase();
+    const profiles=parse("starquest_users",{});
+    const selected=String(session?.username||profiles?.[session?.key]?.username||"").trim().toLowerCase();
     if(selected&&String(state.username||"").trim().toLowerCase()!==selected)throw Error("wallet_account_mismatch");
     const confirmed=Array.isArray(state.ledger)&&state.ledger.some(entry=>
       entry.type==="shoplc_click_reward"&&entry.referenceId===clickId&&Number(entry.amount)===5&&
@@ -154,8 +167,7 @@
   async function rewardShopLcClick({actionType,itemId,href,clickId},retry=false){
     const intent={actionType,itemId,href,clickId:clickId||uid("shoplc-click"),quantId:activeQuantId()};
     if(!retry){const pending=parse(REWARD_QUEUE,[]);if(!pending.some(x=>x.clickId===intent.clickId)){if(!write(REWARD_QUEUE,[...pending,intent]))throw Error("Reward receipt could not be saved")}else Object.assign(intent,pending.find(x=>x.clickId===intent.clickId));}
-    let token=deviceToken();
-    if(!token&&window.QuantaCloudConnection?.resolveDeviceToken)token=await window.QuantaCloudConnection.resolveDeviceToken();
+    const token=await resolveRewardToken();
     if(!token){
       setRewardStatus("Shop LC opened, but this Star Coin wallet is not connected to the cloud ledger yet.","warn");
       return null;
